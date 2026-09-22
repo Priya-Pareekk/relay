@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relay | Distributed Job & Task Queue Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="brand">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <h1>RELAY</h1>
+                    <span class="badge-tag">DISTRIBUTED TASK QUEUE</span>
+                </div>
+            </div>
+            
+            <div class="header-actions">
+                <div class="live-indicator" id="liveIndicator">
+                    <span class="pulse-dot"></span>
+                    <span class="live-text">Live Sync</span>
+                </div>
+                <button class="btn btn-outline" id="refreshBtn" title="Refresh Dashboard">
+                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+                        <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                    </svg>
+                    Refresh
+                </button>
+                <button class="btn btn-secondary" id="openDefinitionsModalBtn">
+                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                    Cron Schedules
+                </button>
+                <button class="btn btn-primary" id="openSubmitJobModalBtn">
+                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    Submit Job
+                </button>
+            </div>
+        </header>
+
+        <!-- Metric Cards Grid -->
+        <section class="metrics-grid">
+            <div class="metric-card" data-status="ALL">
+                <div class="metric-header">
+                    <span class="metric-title">Total Submissions</span>
+                    <span class="metric-icon total-icon">⚡</span>
+                </div>
+                <div class="metric-value" id="metricTotal">0</div>
+                <div class="metric-footer">Distributed async jobs</div>
+            </div>
+
+            <div class="metric-card" data-status="PENDING">
+                <div class="metric-header">
+                    <span class="metric-title">Pending</span>
+                    <span class="metric-icon pending-icon">⏳</span>
+                </div>
+                <div class="metric-value" id="metricPending">0</div>
+                <div class="metric-footer">Queued in Kafka pipeline</div>
+            </div>
+
+            <div class="metric-card" data-status="PROCESSING">
+                <div class="metric-header">
+                    <span class="metric-title">Processing</span>
+                    <span class="metric-icon processing-icon">⚙️</span>
+                </div>
+                <div class="metric-value" id="metricProcessing">0</div>
+                <div class="metric-footer">In-flight execution</div>
+            </div>
+
+            <div class="metric-card" data-status="RETRYING">
+                <div class="metric-header">
+                    <span class="metric-title">Retrying</span>
+                    <span class="metric-icon retrying-icon">🔄</span>
+                </div>
+                <div class="metric-value" id="metricRetrying">0</div>
+                <div class="metric-footer">Exponential backoff active</div>
+            </div>
+
+            <div class="metric-card" data-status="COMPLETED">
+                <div class="metric-header">
+                    <span class="metric-title">Completed</span>
+                    <span class="metric-icon completed-icon">✅</span>
+                </div>
+                <div class="metric-value" id="metricCompleted">0</div>
+                <div class="metric-footer" id="metricSuccessRate">100% 24h success rate</div>
+            </div>
+
+            <div class="metric-card" data-status="DEAD_LETTER">
+                <div class="metric-header">
+                    <span class="metric-title">Dead Letter (DLQ)</span>
+                    <span class="metric-icon dlq-icon">⚠️</span>
+                </div>
+                <div class="metric-value" id="metricDeadLetter">0</div>
+                <div class="metric-footer">Max retries exceeded (Replayable)</div>
+            </div>
+        </section>
+
+        <!-- Main Content Area -->
+        <main class="content-section">
+            <div class="table-container">
+                <div class="table-header-controls">
+                    <div class="filter-group">
+                        <label for="statusFilter">Status:</label>
+                        <select id="statusFilter" class="select-control">
+                            <option value="">All Statuses</option>
+                            <option value="PENDING">PENDING</option>
+                            <option value="PROCESSING">PROCESSING</option>
+                            <option value="RETRYING">RETRYING</option>
+                            <option value="COMPLETED">COMPLETED</option>
+                            <option value="DEAD_LETTER">DEAD_LETTER</option>
+                            <option value="CANCELLED">CANCELLED</option>
+                        </select>
+
+                        <label for="typeFilter">Type:</label>
+                        <select id="typeFilter" class="select-control">
+                            <option value="">All Types</option>
+                            <option value="EMAIL_NOTIFICATION">EMAIL_NOTIFICATION</option>
+                            <option value="REPORT_GENERATION">REPORT_GENERATION</option>
+                        </select>
+                    </div>
+
+                    <div class="search-group">
+                        <input type="text" id="searchInput" class="search-input" placeholder="Search by Job ID or Idempotency Key...">
+                    </div>
+                </div>
+
+                <!-- Jobs Table -->
+                <div class="table-responsive">
+                    <table class="data-table" id="jobsTable">
+                        <thead>
+                            <tr>
+                                <th>Job ID</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Attempts</th>
+                                <th>Idempotency Key</th>
+                                <th>Created</th>
+                                <th>Next Retry / Error</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="jobsTableBody">
+                            <tr>
+                                <td colspan="8" class="empty-state">Loading distributed jobs...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                <div class="pagination-footer">
+                    <div class="pagination-info" id="paginationInfo">Showing 0 of 0 jobs</div>
+                    <div class="pagination-buttons">
+                        <button class="btn btn-sm btn-outline" id="prevPageBtn" disabled>Previous</button>
+                        <span class="current-page-tag" id="currentPageTag">Page 1</span>
+                        <button class="btn btn-sm btn-outline" id="nextPageBtn" disabled>Next</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Submit Job Modal -->
+    <div class="modal-backdrop" id="submitJobModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2>Submit New Job</h2>
+                <button class="modal-close-btn" data-close="submitJobModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="submitJobForm">
+                    <div class="form-group">
+                        <label for="jobTypeSelect">Job Type</label>
+                        <select id="jobTypeSelect" class="form-control" required>
+                            <option value="EMAIL_NOTIFICATION">EMAIL_NOTIFICATION (Simulated Email Dispatch)</option>
+                            <option value="REPORT_GENERATION">REPORT_GENERATION (Simulated Report Pipeline)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group flex-1">
+                            <label for="idempotencyKeyInput">Idempotency Key (Optional)</label>
+                            <input type="text" id="idempotencyKeyInput" class="form-control" placeholder="e.g. order-payment-9941">
+                        </div>
+                        <div class="form-group width-120">
+                            <label for="maxAttemptsInput">Max Attempts</label>
+                            <input type="number" id="maxAttemptsInput" class="form-control" value="5" min="1" max="10">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="label-with-actions">
+                            <label for="payloadEditor">JSON Payload</label>
+                            <div class="template-btns">
+                                <button type="button" class="btn-text" id="loadEmailTemplateBtn">Email Template</button>
+                                <button type="button" class="btn-text" id="loadReportTemplateBtn">Report Template</button>
+                                <button type="button" class="btn-text text-danger" id="loadFailingTemplateBtn">⚡ Fail Template</button>
+                            </div>
+                        </div>
+                        <textarea id="payloadEditor" class="form-control code-editor" rows="6" required></textarea>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline" data-close="submitJobModal">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="submitJobSubmitBtn">Dispatch to Kafka</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Job Detail & Audit History Modal -->
+    <div class="modal-backdrop" id="jobDetailModal">
+        <div class="modal-card modal-lg">
+            <div class="modal-header">
+                <h2>Job Details & Audit History</h2>
+                <button class="modal-close-btn" data-close="jobDetailModal">&times;</button>
+            </div>
+            <div class="modal-body" id="jobDetailBody">
+                <div class="loading-state">Loading job details...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cron Job Definitions Modal -->
+    <div class="modal-backdrop" id="definitionsModal">
+        <div class="modal-card modal-lg">
+            <div class="modal-header">
+                <h2>Recurring Job Definitions (Cron Schedules)</h2>
+                <button class="modal-close-btn" data-close="definitionsModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="definition-actions-bar">
+                    <button class="btn btn-primary btn-sm" id="showNewDefinitionFormBtn">+ Add Recurring Schedule</button>
+                </div>
+
+                <!-- New Definition Form (Hidden by default) -->
+                <div class="new-definition-panel" id="newDefinitionPanel" style="display: none;">
+                    <h3>New Cron Schedule</h3>
+                    <form id="newDefinitionForm">
+                        <div class="form-row">
+                            <div class="form-group flex-1">
+                                <label for="defName">Schedule Name</label>
+                                <input type="text" id="defName" class="form-control" placeholder="e.g. Daily Metrics Reporter" required>
+                            </div>
+                            <div class="form-group width-200">
+                                <label for="defType">Job Type</label>
+                                <select id="defType" class="form-control" required>
+                                    <option value="EMAIL_NOTIFICATION">EMAIL_NOTIFICATION</option>
+                                    <option value="REPORT_GENERATION">REPORT_GENERATION</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="defCron">Cron Expression (e.g. 0 0 9 * * * for 9 AM daily, or */1 * * * * for every min)</label>
+                            <input type="text" id="defCron" class="form-control" placeholder="0 0 9 * * *" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="defPayload">Payload Template (JSON)</label>
+                            <textarea id="defPayload" class="form-control code-editor" rows="3" required>{"reportName": "Daily Summary", "format": "PDF"}</textarea>
+                        </div>
+
+                        <div class="form-buttons-row">
+                            <button type="button" class="btn btn-outline btn-sm" id="cancelDefBtn">Cancel</button>
+                            <button type="submit" class="btn btn-primary btn-sm">Save Cron Schedule</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Definitions List -->
+                <div class="definitions-list-container" id="definitionsList">
+                    <div class="empty-state">No recurring job schedules found.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="/app.js"></script>
+</body>
+</html>

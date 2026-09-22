@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #1B2430;
+    color: #E4DED0;
+    font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+  }
+
+  /* Focus rings in aged brass */
+  :focus-visible {
+    outline: 2px solid #C9A227;
+    outline-offset: 1px;
+  }
+
+  /* Custom minimal dark scrollbars */
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #141C26;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #334054;
+    border-radius: 2px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #465773;
+  }
+}
+
+/* Telegraph ticker scroll animation */
+@keyframes ticker-scroll {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.animate-ticker {
+  animation: ticker-scroll 35s linear infinite;
+  display: flex;
+  width: max-content;
+}
+
+.animate-ticker:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-ticker {
+    animation: none;
+  }
+}
+
+/* Telegraph tape perforated edge */
+.telegraph-tape-border {
+  border-top: 1px dashed rgba(51, 64, 84, 0.7);
+  border-bottom: 1px dashed rgba(51, 64, 84, 0.7);
+}
+

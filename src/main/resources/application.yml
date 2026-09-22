@@ -1,0 +1,114 @@
+server:
+  port: ${PORT:8081}
+
+spring:
+  application:
+    name: relay
+  profiles:
+    active: local,dev
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/relay_db}
+    username: ${SPRING_DATASOURCE_USERNAME:relay_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:relay_password}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      idle-timeout: 30000
+      connection-timeout: 20000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9094}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+    consumer:
+      group-id: relay-job-consumer-group
+      auto-offset-reset: earliest
+      key-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.StringDeserializer
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.trusted.packages: "com.relay.*,java.util.*"
+        spring.json.use.type.headers: false
+        spring.json.value.default.type: com.relay.dto.KafkaJobMessage
+
+relay:
+  security:
+    api-key: ${RELAY_API_KEY:relay-secret-api-key}
+    api-key-header: X-API-Key
+  topics:
+    job-queue: job-queue
+    job-dlq: job-dlq
+    job-dlt: job-queue-dlt
+  retry:
+    base-delay-seconds: 5
+    max-delay-seconds: 900
+    circuit-breaker-delay-seconds: 60
+    poller-interval-ms: 5000
+    batch-size: 50
+  outbox:
+    poller-interval-ms: 500
+    batch-size: 50
+  cron:
+    enabled: true
+    eval-interval-ms: 10000
+  archive:
+    enabled: true
+    cron: "0 0 3 * * *"
+    retention-days: 30
+    batch-size: 500
+    max-batches-per-run: 50
+
+
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
+    metrics:
+      enabled: true
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [corrId=%X{correlationId:-NONE}, jobId=%X{jobId:-NONE}, attempt=%X{attemptNumber:-0}] - %msg%n"
+  level:
+    com.relay: INFO
+    org.springframework.kafka: INFO
+
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
