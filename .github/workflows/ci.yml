@@ -31,6 +31,12 @@ jobs:
           # Enable Testcontainers reuse/daemon support in CI runner
           TESTCONTAINERS_RYUK_DISABLED: "false"
 
+      - name: Print Test Failures on Failure
+        if: failure()
+        run: |
+          echo "==================== SUREFIRE TEST REPORTS ===================="
+          find target/surefire-reports -type f -name "*.txt" -exec cat {} + || true
+
       - name: Upload Test Reports on Failure
         if: failure()
         uses: actions/upload-artifact@v4
