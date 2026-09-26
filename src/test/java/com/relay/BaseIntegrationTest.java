@@ -1,5 +1,8 @@
 package com.relay;
 
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -21,6 +24,20 @@ public abstract class BaseIntegrationTest {
         kafka.start();
     }
 
+    @Autowired
+    private CircuitBreakerRegistry circuitBreakerRegistry;
+
+    // The CircuitBreakerRegistry is a singleton Spring bean shared across the whole
+    // Spring context, which JUnit/Spring reuses across every BaseIntegrationTest
+    // subclass. Without resetting it, a test that trips a job-type's breaker (e.g.
+    // EMAIL_NOTIFICATION) leaves it OPEN for other, unrelated tests that happen to
+    // run within the wait-duration window, causing spurious failures.
+    @BeforeEach
+    void resetCircuitBreakers() {
+        circuitBreakerRegistry.getAllCircuitBreakers()
+                .forEach(io.github.resilience4j.circuitbreaker.CircuitBreaker::reset);
+    }
+
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
@@ -33,4 +50,3 @@ public abstract class BaseIntegrationTest {
         registry.add("relay.security.api-key", () -> "relay-secret-api-key");
     }
 }
-
